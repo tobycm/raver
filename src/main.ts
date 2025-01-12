@@ -1,40 +1,101 @@
 import * as Px from "pixi.js";
 
-import { hsl } from "color-convert";
-
+import "./button.css";
 import "./style.css";
+import { sigmoid } from "./utils";
 
 // Create a PixiJS Application
 const app = new Px.Application();
 await app.init({
   width: window.innerWidth, // Full width of the window
   height: window.innerHeight, // Full height of the window
-  backgroundColor: 0x1e1e1e, // Light blue background
+  backgroundColor: 0x0, // Light blue background
   resolution: window.devicePixelRatio || 1, // Adjust for retina displays
+  resizeTo: window, // Resize the renderer to fill the window
 });
 document.body.appendChild(app.canvas);
 
 const audioContext = new AudioContext();
-const analyser = new AnalyserNode(audioContext, { fftSize: 512 });
+const analyser = new AnalyserNode(audioContext, { fftSize: 2 ** 13 });
 const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+const eachBinWidth = audioContext.sampleRate / analyser.fftSize;
 
-let audioSource: MediaElementAudioSourceNode | undefined;
+let treble = 15000;
+let bass = 0;
 
-const audioInput = document.getElementById("audio") as HTMLInputElement;
-audioInput.addEventListener("change", (event) => {
+let clampedFrequencyDataLength = Math.floor((treble - bass) / eachBinWidth);
+
+function updateClampedFrequencyDataLength() {
+  clampedFrequencyDataLength = Math.floor((treble - bass) / eachBinWidth);
+  console.log(clampedFrequencyDataLength);
+}
+
+updateClampedFrequencyDataLength();
+
+const trebleInput = document.getElementById("treble") as HTMLInputElement;
+const trebleValue = document.getElementById("trebleValue") as HTMLSpanElement;
+trebleInput.value = treble.toString();
+
+trebleInput.addEventListener("input", (event) => {
+  treble = parseInt((event.target as HTMLInputElement).value);
+  updateClampedFrequencyDataLength();
+
+  trebleValue.textContent = treble.toString();
+});
+
+const bassInput = document.getElementById("bass") as HTMLInputElement;
+const bassValue = document.getElementById("bassValue") as HTMLSpanElement;
+bassInput.value = bass.toString();
+
+bassInput.addEventListener("input", (event) => {
+  bass = parseInt((event.target as HTMLInputElement).value);
+  updateClampedFrequencyDataLength();
+
+  bassValue.textContent = bass.toString();
+});
+
+let audioSource: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | undefined;
+
+const videoElement = document.getElementById("videoPlayer") as HTMLVideoElement;
+videoElement.crossOrigin = "anonymous";
+videoElement.loop = true;
+
+const audioElement = document.getElementById("audioPlayer") as HTMLAudioElement;
+audioElement.crossOrigin = "anonymous";
+audioElement.loop = true;
+
+const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+fileInput.addEventListener("change", (event) => {
+  // audio or video file
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
-  const audio = new Audio(URL.createObjectURL(file));
-  audio.crossOrigin = "anonymous";
-  audio.loop = true;
-  audio.play();
-
   if (audioSource) audioSource.disconnect();
 
-  audioSource = audioContext.createMediaElementSource(audio);
-  audioSource.connect(analyser);
+  if (file.type.startsWith("video/")) {
+    videoElement.src = URL.createObjectURL(file);
+    audioElement.hidden = true;
+    videoElement.hidden = false;
+
+    audioSource = audioContext.createMediaElementSource(videoElement);
+  }
+  if (file.type.startsWith("audio/")) {
+    audioElement.src = URL.createObjectURL(file);
+    videoElement.hidden = true;
+    audioElement.hidden = false;
+
+    audioSource = audioContext.createMediaElementSource(audioElement);
+  }
+
+  audioSource!.connect(analyser);
   analyser.connect(audioContext.destination);
+
+  if (file.type.startsWith("audio/")) {
+    audioElement.play();
+  }
+  if (file.type.startsWith("video/")) {
+    videoElement.play();
+  }
 });
 
 const fromMicButton = document.getElementById("fromMic") as HTMLButtonElement;
@@ -49,20 +110,28 @@ fromMicButton.addEventListener("click", async () => {
 
   if (audioSource) audioSource.disconnect();
 
-  const micSource = audioContext.createMediaStreamSource(stream);
-  micSource.connect(analyser);
+  audioSource = audioContext.createMediaStreamSource(stream);
+  audioSource.connect(analyser);
   analyser.connect(audioContext.destination);
 });
 
-// const scene = new Px.Container();
-// app.stage.addChild(scene);
+app.ticker.add(() => {
+  analyser.getByteFrequencyData(frequencyData);
+
+  const data = frequencyData.slice(bass / eachBinWidth, treble / eachBinWidth);
+
+  animateLights(data);
+  animateBars(data);
+});
+
+const lightsCount = 30;
 
 const lights: Px.Graphics[] = [];
 
-for (let i = 0; i < 64; i++) {
+for (let i = 0; i < lightsCount; i++) {
   const light = new Px.Graphics({
     x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
+    y: Math.random() * (window.innerHeight - 400),
   });
 
   light.circle(0, 0, 10).fill(0xffffff);
@@ -71,24 +140,51 @@ for (let i = 0; i < 64; i++) {
   lights.push(light);
 }
 
-function animateLights() {
-  analyser.getByteFrequencyData(frequencyData);
-
+function animateLights(data: Uint8Array) {
   lights.forEach((light, i) => {
-    const frequencyIndex = i % frequencyData.length;
-    const frequency = (48000 / frequencyData.length) * frequencyIndex;
-    const intensity = frequencyData[frequencyIndex] / 255;
+    const frequencyIndex = Math.floor((i / lights.length) * clampedFrequencyDataLength);
 
-    const hue = (i / frequencyData.length) * 360;
-    const color = hsl.rgb([hue, 100, 50]);
+    const intensity = data[frequencyIndex] / 255;
+
+    const hue = Math.floor((i / lights.length) * 360);
 
     light.clear();
 
-    light.circle(0, 0, 10).fill(color);
+    light.circle(0, 0, 10).fill(`hsl(${hue}, 100%, 50%)`);
 
     light.tint = intensity * 0xffffff;
-    light.scale.set(intensity * 2);
+    light.scale.set(sigmoid(intensity, 5, 0.5) * 10);
   });
 }
 
-app.ticker.add(animateLights);
+const barsCount = 200;
+let barWidth = window.innerWidth / barsCount;
+
+const bars: Px.Graphics[] = [];
+
+for (let i = 0; i < barsCount; i++) {
+  const hue = Math.floor((i / barsCount) * 360);
+
+  const bar = new Px.Graphics().rect(i * barWidth, window.innerHeight - 200, barWidth, 200).fill(`hsl(${hue}, 100%, 50%)`);
+
+  app.stage.addChild(bar);
+  bars.push(bar);
+}
+
+function animateBars(data: Uint8Array) {
+  bars.forEach((bar, i) => {
+    const frequencyIndex = Math.floor((i / bars.length) * clampedFrequencyDataLength);
+
+    const intensity = data[frequencyIndex] / 255;
+
+    const hue = Math.floor((i / bars.length) * 360);
+
+    bar.clear();
+
+    bar
+      .rect(i * barWidth, window.innerHeight - intensity * window.innerHeight, barWidth, intensity * window.innerHeight)
+      .fill(`hsl(${hue}, 100%, 50%)`);
+
+    bar.tint = intensity * 0xffffff;
+  });
+}

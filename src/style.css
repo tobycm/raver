@@ -3,16 +3,48 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  color: #fff;
+
+  font-family: monospace;
+  font-size: larger;
+  font-weight: 900;
 }
 
 body {
   margin: 0;
+  padding: 0;
 }
 
 #controls {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
+
+  z-index: 2;
+
+  margin: 1rem;
+
   position: absolute;
-  bottom: 20px;
+}
+
+#controls > * {
+  margin: 0.5rem;
+}
+
+#videoPlayer,
+#audioPlayer {
+  z-index: 1;
+
+  position: absolute;
+
+  max-width: 40%;
+  max-height: 40%;
+
+  top: 50%;
   left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+#audioPlayer {
+  width: 60%;
 }

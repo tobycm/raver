@@ -8,9 +8,25 @@
   </head>
   <body>
     <div id="controls">
-      <input type="file" id="audio" accept="audio/*" />
-      <button id="fromMic">From Mic</button>
+      <label for="fileInput" class="button">From file (audio, video)</label>
+      <input type="file" id="fileInput" accept="audio/*,video/*" />
+      <button class="button" id="fromMic">From mic</button>
+
+      <div>
+        <label for="treble">Treble freq:</label>
+        <input type="range" id="treble" min="10000" max="48000" value="20000" />
+        <span id="trebleValue">20000</span>
+      </div>
+
+      <div>
+        <label for="bass">Bass freq:</label>
+        <input type="range" id="bass" min="0" max="10000" value="0" />
+        <span id="bassValue">0</span>
+      </div>
     </div>
+
+    <audio id="audioPlayer" controls hidden></audio>
+    <video id="videoPlayer" controls hidden></video>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
