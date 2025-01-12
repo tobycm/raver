@@ -14,18 +14,27 @@
 
       <div>
         <label for="treble">Treble freq:</label>
-        <input type="range" id="treble" min="10000" max="48000" value="20000" />
+        <input type="range" id="treble" min="5000" max="20000" value="20000" />
         <span id="trebleValue">20000</span>
       </div>
 
       <div>
         <label for="bass">Bass freq:</label>
-        <input type="range" id="bass" min="0" max="10000" value="0" />
+        <input type="range" id="bass" min="0" max="8000" value="0" />
         <span id="bassValue">0</span>
+      </div>
+
+      <div>
+        <label for="smoothing">Smoothing:</label>
+        <input type="range" id="smoothing" min="0" max="100" value="80" />
+        <span id="smoothingValue">0.8</span>
       </div>
     </div>
 
-    <audio id="audioPlayer" controls hidden></audio>
+    <div id="audioPlayerContainer">
+      <img src="" alt="" hidden id="albumArt" />
+      <audio id="audioPlayer" controls hidden></audio>
+    </div>
     <video id="videoPlayer" controls hidden></video>
 
     <script type="module" src="/src/main.ts"></script>

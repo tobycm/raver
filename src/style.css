@@ -32,7 +32,7 @@ body {
 }
 
 #videoPlayer,
-#audioPlayer {
+#audioPlayerContainer {
   z-index: 1;
 
   position: absolute;
@@ -45,6 +45,17 @@ body {
   transform: translate(-50%, -50%);
 }
 
-#audioPlayer {
+#audioPlayerContainer {
+  text-align: center;
+
   width: 60%;
+}
+
+#audioPlayer {
+  width: 100%;
+}
+
+#albumArt {
+  max-width: 40%;
+  max-height: 40%;
 }

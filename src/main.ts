@@ -4,6 +4,21 @@ import "./button.css";
 import "./style.css";
 import { sigmoid } from "./utils";
 
+// @ts-ignore
+import { read } from "jsmediatags/dist/jsmediatags.min";
+// @ts-ignore
+import type { read as TRead } from "@types/jsmediatags";
+import { TagType } from "jsmediatags/types";
+
+async function getTags(file: File) {
+  return new Promise<TagType>((resolve, reject) => {
+    (read as typeof TRead)(file, {
+      onSuccess: (tag) => resolve(tag),
+      onError: (error) => reject(error),
+    });
+  });
+}
+
 // Create a PixiJS Application
 const app = new Px.Application();
 await app.init({
@@ -16,17 +31,17 @@ await app.init({
 document.body.appendChild(app.canvas);
 
 const audioContext = new AudioContext();
-const analyser = new AnalyserNode(audioContext, { fftSize: 2 ** 13 });
+const analyser = new AnalyserNode(audioContext, { fftSize: 2 ** 14 });
 const frequencyData = new Uint8Array(analyser.frequencyBinCount);
 const eachBinWidth = audioContext.sampleRate / analyser.fftSize;
 
-let treble = 15000;
+let treble = 20000;
 let bass = 0;
 
-let clampedFrequencyDataLength = Math.floor((treble - bass) / eachBinWidth);
+let clampedFrequencyDataLength = Math.floor((treble - bass) / eachBinWidth) + 1;
 
 function updateClampedFrequencyDataLength() {
-  clampedFrequencyDataLength = Math.floor((treble - bass) / eachBinWidth);
+  clampedFrequencyDataLength = Math.floor((treble - bass) / eachBinWidth) + 1;
   console.log(clampedFrequencyDataLength);
 }
 
@@ -54,18 +69,30 @@ bassInput.addEventListener("input", (event) => {
   bassValue.textContent = bass.toString();
 });
 
+const smoothingInput = document.getElementById("smoothing") as HTMLInputElement;
+const smoothingValue = document.getElementById("smoothingValue") as HTMLSpanElement;
+smoothingInput.value = (analyser.smoothingTimeConstant * 100).toString();
+
+smoothingInput.addEventListener("input", (event) => {
+  analyser.smoothingTimeConstant = parseInt((event.target as HTMLInputElement).value) / 100;
+
+  smoothingValue.textContent = analyser.smoothingTimeConstant.toString();
+});
+
 let audioSource: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | undefined;
 
 const videoElement = document.getElementById("videoPlayer") as HTMLVideoElement;
 videoElement.crossOrigin = "anonymous";
 videoElement.loop = true;
 
+const albumArt = document.getElementById("albumArt") as HTMLImageElement;
+
 const audioElement = document.getElementById("audioPlayer") as HTMLAudioElement;
 audioElement.crossOrigin = "anonymous";
 audioElement.loop = true;
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
-fileInput.addEventListener("change", (event) => {
+fileInput.addEventListener("change", async (event) => {
   // audio or video file
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
@@ -83,8 +110,23 @@ fileInput.addEventListener("change", (event) => {
     audioElement.src = URL.createObjectURL(file);
     videoElement.hidden = true;
     audioElement.hidden = false;
+    albumArt.hidden = true;
 
     audioSource = audioContext.createMediaElementSource(audioElement);
+
+    const { tags } = await getTags(file);
+
+    console.log(tags);
+
+    if (tags.picture) {
+      const { data } = tags.picture;
+      const bytes = new Uint8Array(data);
+      const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), "");
+      const base64String = btoa(binary);
+
+      albumArt.src = `data:${tags.picture.format};base64,${base64String}`;
+      albumArt.hidden = false;
+    }
   }
 
   audioSource!.connect(analyser);
@@ -122,6 +164,32 @@ app.ticker.add(() => {
 
   animateLights(data);
   animateBars(data);
+  renderBass(frequencyData);
+});
+
+const gradient = new Px.FillGradient(0, 0, window.innerWidth, window.innerHeight);
+
+gradient.addColorStop(0, 0xff0000);
+gradient.addColorStop(0.4, 0x000000);
+gradient.addColorStop(0.7, 0x000000);
+gradient.addColorStop(1, 0xff0000);
+
+const bassVisualizer = new Px.Graphics().rect(0, 0, window.innerWidth, window.innerHeight).fill(gradient);
+
+bassVisualizer.tint = 0x000000;
+
+app.stage.addChild(bassVisualizer);
+
+function renderBass(data: Uint8Array) {
+  const bassData = data.slice(0, Math.floor(200 / eachBinWidth));
+
+  const bassIntensity = bassData.reduce((acc, curr) => acc + curr, 0) / 255 / bassData.length;
+
+  bassVisualizer.tint = sigmoid(bassIntensity, 10, 0.5) * 0xffffff;
+}
+
+app.renderer.on("resize", () => {
+  bassVisualizer.clear().rect(0, 0, window.innerWidth, window.innerHeight).fill(gradient);
 });
 
 const lightsCount = 30;
@@ -148,12 +216,11 @@ function animateLights(data: Uint8Array) {
 
     const hue = Math.floor((i / lights.length) * 360);
 
-    light.clear();
+    light.clear().circle(0, 0, 10).fill(`hsl(${hue}, 100%, 50%)`);
 
-    light.circle(0, 0, 10).fill(`hsl(${hue}, 100%, 50%)`);
-
-    light.tint = intensity * 0xffffff;
+    // light.tint = intensity * 0xffffff;
     light.scale.set(sigmoid(intensity, 5, 0.5) * 10);
+    light.alpha = intensity;
   });
 }
 
@@ -179,9 +246,8 @@ function animateBars(data: Uint8Array) {
 
     const hue = Math.floor((i / bars.length) * 360);
 
-    bar.clear();
-
     bar
+      .clear()
       .rect(i * barWidth, window.innerHeight - intensity * window.innerHeight, barWidth, intensity * window.innerHeight)
       .fill(`hsl(${hue}, 100%, 50%)`);
 
