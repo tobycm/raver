@@ -97,6 +97,8 @@ fileInput.addEventListener("change", async (event) => {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
+  audioContext.resume();
+
   if (audioSource) audioSource.disconnect();
 
   if (file.type.startsWith("video/")) {
@@ -149,6 +151,8 @@ fromMicButton.addEventListener("click", async () => {
       autoGainControl: false,
     },
   });
+
+  audioContext.resume();
 
   if (audioSource) audioSource.disconnect();
 
