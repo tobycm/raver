@@ -155,6 +155,10 @@ fromMicButton.addEventListener("click", async () => {
   audioSource = audioContext.createMediaStreamSource(stream);
   audioSource.connect(analyser);
   analyser.connect(audioContext.destination);
+
+  audioElement.hidden = true;
+  videoElement.hidden = true;
+  albumArt.hidden = true;
 });
 
 app.ticker.add(() => {
