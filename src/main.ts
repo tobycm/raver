@@ -9,8 +9,62 @@ import { read } from "jsmediatags/dist/jsmediatags.min";
 // @ts-ignore
 import type { read as TRead } from "@types/jsmediatags";
 import { TagType } from "jsmediatags/types";
+import demos from "./demos";
 
-async function getTags(file: File) {
+alert("Epilepsy warning: This project contains flashing lights.");
+
+const demosList = document.getElementById("demosList") as HTMLUListElement;
+
+function handleDemoOnClick(event: MouseEvent) {
+  event.preventDefault();
+
+  const target = event.target as HTMLAnchorElement;
+
+  const url = new URL(target.href);
+
+  loadFile(url.pathname, target.dataset.mediatype as "video" | "audio");
+
+  if (target.dataset.override) {
+    const override = JSON.parse(target.dataset.override) as { treble?: number; bass?: number };
+
+    console.log(override);
+    console.log(treble, bass);
+
+    if (override.treble) {
+      treble = override.treble;
+      trebleInput.value = treble.toString();
+      trebleValue.textContent = treble.toString();
+    }
+
+    if (override.bass) {
+      bass = override.bass;
+      bassInput.value = bass.toString();
+      bassValue.textContent = bass.toString();
+    }
+
+    updateClampedFrequencyDataLength();
+  }
+
+  return false;
+}
+
+demos.forEach((demo) => {
+  const listItem = document.createElement("li");
+
+  const anchor = document.createElement("a");
+  anchor.href = demo.url;
+  anchor.textContent = demo.url.split("/").pop()!;
+  anchor.dataset.mediatype = demo.type;
+  if (demo.override) {
+    anchor.dataset.override = JSON.stringify(demo.override);
+  }
+  anchor.onclick = handleDemoOnClick;
+
+  listItem.appendChild(anchor);
+  demosList.appendChild(listItem);
+});
+
+async function getTags(file: string | File) {
   return new Promise<TagType>((resolve, reject) => {
     (read as typeof TRead)(file, {
       onSuccess: (tag) => resolve(tag),
@@ -97,50 +151,58 @@ fileInput.addEventListener("change", async (event) => {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
+  await loadFile(file);
+});
+
+async function loadFile(url: string | File, type?: "video" | "audio") {
   audioContext.resume();
 
   if (audioSource) audioSource.disconnect();
 
-  if (file.type.startsWith("video/")) {
-    videoElement.src = URL.createObjectURL(file);
+  const realType = url instanceof File ? (url.type.startsWith("video/") ? "video" : url.type.startsWith("audio/") ? "audio" : undefined) : type;
+
+  if (!realType) return;
+
+  if (realType === "video") {
+    videoElement.src = url instanceof File ? URL.createObjectURL(url) : url;
     audioElement.hidden = true;
     videoElement.hidden = false;
 
     audioSource = audioContext.createMediaElementSource(videoElement);
   }
-  if (file.type.startsWith("audio/")) {
-    audioElement.src = URL.createObjectURL(file);
+  if (realType === "audio") {
+    audioElement.src = url instanceof File ? URL.createObjectURL(url) : url;
     videoElement.hidden = true;
     audioElement.hidden = false;
     albumArt.hidden = true;
 
     audioSource = audioContext.createMediaElementSource(audioElement);
 
-    const { tags } = await getTags(file);
+    if (url instanceof File) {
+      const { tags } = await getTags(url);
 
-    console.log(tags);
+      if (tags.picture) {
+        const { data } = tags.picture;
+        const bytes = new Uint8Array(data);
+        const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), "");
+        const base64String = btoa(binary);
 
-    if (tags.picture) {
-      const { data } = tags.picture;
-      const bytes = new Uint8Array(data);
-      const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), "");
-      const base64String = btoa(binary);
-
-      albumArt.src = `data:${tags.picture.format};base64,${base64String}`;
-      albumArt.hidden = false;
+        albumArt.src = `data:${tags.picture.format};base64,${base64String}`;
+        albumArt.hidden = false;
+      }
     }
   }
 
   audioSource!.connect(analyser);
   analyser.connect(audioContext.destination);
 
-  if (file.type.startsWith("audio/")) {
+  if (realType === "audio") {
     audioElement.play();
   }
-  if (file.type.startsWith("video/")) {
+  if (realType === "video") {
     videoElement.play();
   }
-});
+}
 
 const fromMicButton = document.getElementById("fromMic") as HTMLButtonElement;
 fromMicButton.addEventListener("click", async () => {
@@ -165,6 +227,10 @@ fromMicButton.addEventListener("click", async () => {
   albumArt.hidden = true;
 });
 
+const behindStage = new Px.Container({});
+
+app.stage.addChild(behindStage);
+
 app.ticker.add(() => {
   analyser.getByteFrequencyData(frequencyData);
 
@@ -173,6 +239,8 @@ app.ticker.add(() => {
   animateLights(data);
   animateBars(data);
   renderBass(frequencyData);
+  detectBeat(frequencyData);
+  renderBeat();
 });
 
 const gradient = new Px.FillGradient(0, 0, window.innerWidth, window.innerHeight);
@@ -186,7 +254,7 @@ const bassVisualizer = new Px.Graphics().rect(0, 0, window.innerWidth, window.in
 
 bassVisualizer.tint = 0x000000;
 
-app.stage.addChild(bassVisualizer);
+behindStage.addChild(bassVisualizer);
 
 function renderBass(data: Uint8Array) {
   const bassData = data.slice(0, Math.floor(200 / eachBinWidth));
@@ -261,4 +329,84 @@ function animateBars(data: Uint8Array) {
 
     bar.tint = intensity * 0xffffff;
   });
+}
+
+const HISTORY_SIZE = 5; // The number of recent amplitude values to consider
+const amplitudeHistory: number[] = [];
+
+function detectBeats(data: Uint8Array): boolean {
+  // Calculate the average amplitude
+  const sum = data.reduce((acc, value) => acc + value, 0);
+  const average = sum / data.length;
+
+  // Update the amplitude history
+  amplitudeHistory.push(average);
+  if (amplitudeHistory.length > HISTORY_SIZE) {
+    amplitudeHistory.shift(); // Remove the oldest amplitude value
+  }
+
+  // Calculate the moving average and standard deviation
+  const historyAverage = amplitudeHistory.reduce((a, b) => a + b, 0) / amplitudeHistory.length;
+  const variance = amplitudeHistory.reduce((a, b) => a + Math.pow(b - historyAverage, 2), 0) / amplitudeHistory.length;
+  const standardDeviation = Math.sqrt(variance);
+
+  // Set a dynamic threshold based on the moving average and standard deviation
+  const dynamicThreshold = historyAverage + standardDeviation * 1.7;
+
+  return average > dynamicThreshold;
+}
+
+const theBeats: Px.Graphics[] = [];
+
+let lastBeat = 0;
+
+function detectBeat(data: Uint8Array) {
+  if (!detectBeats(data)) return;
+
+  const now = Date.now();
+  if (now - lastBeat < 100) return;
+
+  lastBeat = now;
+
+  const beat = new Px.Graphics({
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+  })
+    .circle(0, 0, 10)
+    .fill(0x00aeff);
+
+  beat.scale.set(7);
+
+  const innerCircle = new Px.Graphics({
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+  })
+    .circle(0, 0, 10)
+    .fill(0);
+
+  innerCircle.scale.set(4);
+
+  beat.setMask(innerCircle);
+
+  behindStage.addChild(beat);
+
+  theBeats.push(beat);
+}
+
+function renderBeat() {
+  const removeIndices: number[] = [];
+
+  theBeats.forEach((beat, index) => {
+    beat.scale.set(beat.scale.x * 1.1);
+
+    beat.alpha -= 0.03;
+
+    if (beat.alpha < 0) {
+      behindStage.removeChild(beat);
+
+      removeIndices.push(index);
+    }
+  });
+
+  removeIndices.reverse().forEach((index) => theBeats.splice(index, 1));
 }
