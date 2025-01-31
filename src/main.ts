@@ -1,5 +1,8 @@
 import * as Px from "pixi.js";
 
+import "@fontsource/ubuntu";
+import "@fontsource/ubuntu-mono";
+
 import "./button.css";
 import "./style.css";
 import { randomString, sigmoid } from "./utils";
@@ -173,20 +176,18 @@ fileInput.addEventListener("change", async (event) => {
 async function loadFile(url: string | File, type?: "video" | "audio") {
   audioContext.resume();
 
-  if (audioSource) audioSource.disconnect();
-
   const realType = url instanceof File ? (url.type.startsWith("video/") ? "video" : url.type.startsWith("audio/") ? "audio" : undefined) : type;
 
   if (!realType) return;
 
-  if (realType === "video") {
+  if (!audioSource && realType === "video") {
     videoElement.src = url instanceof File ? URL.createObjectURL(url) : url;
     audioElement.hidden = true;
     videoElement.hidden = false;
 
     audioSource = audioContext.createMediaElementSource(videoElement);
   }
-  if (realType === "audio") {
+  if (!audioSource && realType === "audio") {
     audioElement.src = url instanceof File ? URL.createObjectURL(url) : url;
     videoElement.hidden = true;
     audioElement.hidden = false;

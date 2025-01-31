@@ -6,7 +6,7 @@
 
   color: #fff;
 
-  font-family: monospace;
+  font-family: "Roboto Mono", "Roboto", monospace;
   font-size: larger;
   font-weight: 900;
 }
@@ -85,8 +85,8 @@ body {
 
 #demos ul {
   height: 20vh;
-  overflow: hidden;
-  overflow-y: scroll;
+  /* overflow: hidden;
+  overflow-y: scroll; */
 }
 
 #syncServer {
@@ -96,4 +96,26 @@ body {
   left: 1vw;
 
   z-index: 2;
+}
+
+input {
+  background-color: transparent;
+  border: 1px solid #fff;
+  color: #fff;
+  padding: 0.5rem;
+
+  font-size: 1rem;
+}
+
+button {
+  background-color: transparent;
+  border: 1px solid #fff;
+  color: #fff;
+  padding: 0.5rem;
+
+  font-size: 1rem;
+}
+
+#sync {
+  margin-top: 2vh;
 }
