@@ -180,20 +180,20 @@ async function loadFile(url: string | File, type?: "video" | "audio") {
 
   if (!realType) return;
 
-  if (!audioSource && realType === "video") {
+  if (!audioSource) audioSource = audioContext.createMediaElementSource(videoElement);
+
+  if (realType === "video") {
     videoElement.src = url instanceof File ? URL.createObjectURL(url) : url;
     audioElement.hidden = true;
     videoElement.hidden = false;
-
-    audioSource = audioContext.createMediaElementSource(videoElement);
+    audioElement.pause();
   }
-  if (!audioSource && realType === "audio") {
+  if (realType === "audio") {
     audioElement.src = url instanceof File ? URL.createObjectURL(url) : url;
     videoElement.hidden = true;
     audioElement.hidden = false;
     albumArt.hidden = true;
-
-    audioSource = audioContext.createMediaElementSource(audioElement);
+    videoElement.pause();
 
     if (url instanceof File) {
       const { tags } = await getTags(url);
