@@ -7,9 +7,5 @@
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "destr": "^2.0.3",
-    "valibot": "^1.0.0-beta.14"
   }
 }
