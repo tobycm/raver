@@ -7,35 +7,56 @@
     <title>Toby's Light Party</title>
   </head>
   <body>
-    <div id="controls">
-      <label for="fileInput" class="button">From file (audio, video)</label>
-      <input type="file" id="fileInput" accept="audio/*,video/*" />
-      <button class="button" id="fromMic">From mic</button>
+    <style>
+      body {
+        background-color: black;
+      }
+    </style>
 
-      <div>
-        <label for="treble">Treble freq:</label>
-        <input type="range" id="treble" min="5000" max="20000" value="20000" />
-        <span id="trebleValue">20000</span>
+    <div id="ui">
+      <div id="controls">
+        <label for="fileInput" class="button">From file (audio, video)</label>
+        <input type="file" id="fileInput" accept="audio/*,video/*" />
+        <button class="button" id="fromMic">From mic</button>
+        <div>
+          <label for="treble">Treble freq:</label>
+          <input type="range" id="treble" min="5000" max="20000" value="20000" />
+          <span id="trebleValue">20000</span>
+        </div>
+        <div>
+          <label for="bass">Bass freq:</label>
+          <input type="range" id="bass" min="0" max="8000" value="0" />
+          <span id="bassValue">0</span>
+        </div>
+        <div>
+          <label for="smoothing">Smoothing:</label>
+          <input type="range" id="smoothing" min="0" max="100" value="80" />
+          <span id="smoothingValue">0.8</span>
+        </div>
       </div>
+      <nav id="demos">
+        <h2>Demo media, click on one to try</h2>
+        <ul id="demosList"></ul>
+      </nav>
 
-      <div>
-        <label for="bass">Bass freq:</label>
-        <input type="range" id="bass" min="0" max="8000" value="0" />
-        <span id="bassValue">0</span>
-      </div>
+      <p style="position: absolute; color: gray; z-index: 3; width: 100%; text-align: center">Click anywhere to hide the UI</p>
 
-      <div>
-        <label for="smoothing">Smoothing:</label>
-        <input type="range" id="smoothing" min="0" max="100" value="80" />
-        <span id="smoothingValue">0.8</span>
+      <div id="syncServer">
+        <h2>Sync server</h2>
+        <div>
+          <label for="syncServerInput">Server URL:</label>
+          <input type="text" id="syncServerInput" value="ws://localhost:4590" />
+        </div>
+        <div>
+          <label for="syncRoom">Room:</label>
+          <input type="text" id="syncRoom" value="default" />
+
+          <input type="checkbox" id="host" />
+          <label for="host">Host?</label>
+        </div>
+        <button id="sync">Connect</button>
       </div>
     </div>
-
-    <nav id="demos">
-      <h2>Demo media, click on one to try</h2>
-
-      <ul id="demosList"></ul>
-    </nav>
 
     <div id="audioPlayerContainer">
       <img src="" alt="" hidden id="albumArt" />

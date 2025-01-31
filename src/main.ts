@@ -2,7 +2,7 @@ import * as Px from "pixi.js";
 
 import "./button.css";
 import "./style.css";
-import { sigmoid } from "./utils";
+import { randomString, sigmoid } from "./utils";
 
 // @ts-ignore
 import { read } from "jsmediatags/dist/jsmediatags.min";
@@ -12,6 +12,8 @@ import { TagType } from "jsmediatags/types";
 import demos from "./demos";
 
 alert("Epilepsy warning: This project contains flashing lights.");
+
+const prodWsUrl = "wss://raver-sync.tobycm.dev";
 
 const demosList = document.getElementById("demosList") as HTMLUListElement;
 
@@ -73,6 +75,9 @@ async function getTags(file: string | File) {
   });
 }
 
+const url = new URL(window.location.href);
+const DEV = url.port === "5173";
+
 // Create a PixiJS Application
 const app = new Px.Application();
 await app.init({
@@ -82,7 +87,18 @@ await app.init({
   resolution: window.devicePixelRatio || 1, // Adjust for retina displays
   resizeTo: window, // Resize the renderer to fill the window
 });
-document.body.appendChild(app.canvas);
+const canvas = document.body.appendChild(app.canvas);
+canvas.style.position = "fixed";
+canvas.style.top = "0";
+canvas.style.left = "0";
+canvas.style.width = "100%";
+canvas.style.height = "100%";
+
+canvas.addEventListener("click", () => {
+  const ui = document.getElementById("ui") as HTMLDivElement;
+
+  ui.hidden = !ui.hidden;
+});
 
 const audioContext = new AudioContext();
 const analyser = new AnalyserNode(audioContext, { fftSize: 2 ** 14 });
@@ -202,6 +218,8 @@ async function loadFile(url: string | File, type?: "video" | "audio") {
   if (realType === "video") {
     videoElement.play();
   }
+
+  from = "local";
 }
 
 const fromMicButton = document.getElementById("fromMic") as HTMLButtonElement;
@@ -225,14 +243,83 @@ fromMicButton.addEventListener("click", async () => {
   audioElement.hidden = true;
   videoElement.hidden = true;
   albumArt.hidden = true;
+
+  from = "local";
 });
 
-const behindStage = new Px.Container({});
+let ws: WebSocket | undefined;
+let wsMeta: WebSocket | undefined;
+let wsMetaID: string | undefined;
 
-app.stage.addChild(behindStage);
+const syncServerInput = document.getElementById("syncServerInput") as HTMLInputElement;
 
-app.ticker.add(() => {
+if (DEV) {
+  // dev
+  const wsUrl = new URL(window.location.href);
+  wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
+  wsUrl.port = "4590";
+  syncServerInput.value = wsUrl.href;
+} else syncServerInput.value = prodWsUrl;
+
+const syncRoom = document.getElementById("syncRoom") as HTMLInputElement;
+const hostButton = document.getElementById("host") as HTMLInputElement;
+
+const syncButton = document.getElementById("sync") as HTMLButtonElement;
+syncButton.addEventListener("click", async () => {
+  if (ws) {
+    ws.close();
+    ws = undefined;
+  }
+
+  if (wsMeta) {
+    wsMeta.close();
+    wsMeta = undefined;
+  }
+
+  const url = new URL(syncServerInput.value);
+  url.searchParams.set("room", syncRoom.value);
+
+  ws = new WebSocket(url);
+
+  url.searchParams.set("meta", "");
+
+  wsMeta = new WebSocket(url);
+
+  from = "remote";
+
+  ws.onmessage = async (event) => {
+    frequencyData.set(new Uint8Array(await (event.data as Blob).arrayBuffer()));
+  };
+
+  wsMeta.onopen = () => {
+    if (hostButton.checked) return;
+    wsMetaID = randomString(64);
+    wsMeta!.send(JSON.stringify({ type: "ping" }));
+  };
+
+  wsMeta.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.type === "pong" && data.id === wsMetaID) {
+    }
+  };
+});
+
+let from: "local" | "remote" = "local";
+
+function getData() {
+  if (from !== "local") return;
+
   analyser.getByteFrequencyData(frequencyData);
+
+  if (!hostButton.checked) return;
+
+  if (ws?.readyState !== WebSocket.OPEN) return;
+  ws.send(frequencyData);
+}
+
+function render() {
+  getData();
 
   const data = frequencyData.slice(bass / eachBinWidth, treble / eachBinWidth);
 
@@ -241,7 +328,13 @@ app.ticker.add(() => {
   renderBass(frequencyData);
   detectBeat(frequencyData);
   renderBeat();
-});
+}
+
+app.ticker.add(render);
+
+const behindStage = new Px.Container({});
+
+app.stage.addChild(behindStage);
 
 const gradient = new Px.FillGradient(0, 0, window.innerWidth, window.innerHeight);
 

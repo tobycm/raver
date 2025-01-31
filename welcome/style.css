@@ -1,0 +1,45 @@
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  background-color: #000;
+  color: #fff;
+
+  font-family: "Playpen Sans", sans-serif;
+
+  font-size: xx-large;
+  /* font-weight: 900; */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#demo {
+  position: sticky;
+  height: 100vh;
+  @media screen and (max-width: 768px) {
+    position: relative;
+  }
+}
+
+#content {
+  display: flex;
+
+  flex-direction: row;
+
+  @media screen and (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+* {
+  margin: 0;
+}
+
+#yap1 {
+  margin: 2vh 3vw;
+}

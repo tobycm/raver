@@ -79,10 +79,21 @@ body {
 
   top: 1vh;
   right: 3vw;
+
+  z-index: 2;
 }
 
 #demos ul {
   height: 20vh;
   overflow: hidden;
   overflow-y: scroll;
+}
+
+#syncServer {
+  position: absolute;
+
+  bottom: 2vh;
+  left: 1vw;
+
+  z-index: 2;
 }
