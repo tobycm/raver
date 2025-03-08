@@ -1,8 +1,5 @@
 import * as Px from "pixi.js";
 
-import "@fontsource/ubuntu";
-import "@fontsource/ubuntu-mono";
-
 import "./button.css";
 import "./style.css";
 import { randomString, sigmoid } from "./utils";
