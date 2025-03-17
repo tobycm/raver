@@ -10,6 +10,9 @@
   font-family: "Playpen Sans", sans-serif;
 
   font-size: xx-large;
+  @media screen and (max-width: 920px) {
+    font-size: larger;
+  }
   /* font-weight: 900; */
 }
 
@@ -21,7 +24,11 @@ body {
 #demo {
   position: sticky;
   height: 100vh;
-  @media screen and (max-width: 768px) {
+  @media screen and (max-width: 920px) {
+    height: auto;
+    width: 100%;
+  }
+  @media screen and (max-width: 920px) {
     position: relative;
   }
 }
@@ -31,7 +38,7 @@ body {
 
   flex-direction: row;
 
-  @media screen and (max-width: 768px) {
+  @media screen and (max-width: 920px) {
     flex-direction: column;
   }
 }
